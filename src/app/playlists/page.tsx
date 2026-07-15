@@ -68,7 +68,7 @@ export default function PlaylistsPage() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch("/api/playlists");
+        const res = await fetch("/spotify-tools/api/playlists");
         if (!res.ok) {
           throw new Error(`Failed to load playlists: ${res.statusText}`);
         }
@@ -107,7 +107,7 @@ export default function PlaylistsPage() {
     setTracks([]);
 
     try {
-      const res = await fetch(`/api/playlists/${playlist.id}`);
+      const res = await fetch(`/spotify-tools/api/playlists/${playlist.id}`);
       if (!res.ok) {
         throw new Error(`Failed to fetch playlist tracks: ${res.statusText}`);
       }
@@ -131,7 +131,7 @@ export default function PlaylistsPage() {
   const executeRemoveDuplicates = async (playlist: SpotifyPlaylist) => {
     setDeduplicating(true);
     try {
-      const res = await fetch(`/api/playlists/${playlist.id}/remove-duplicates`, {
+      const res = await fetch(`/spotify-tools/api/playlists/${playlist.id}/remove-duplicates`, {
         method: "POST",
       });
 
@@ -201,7 +201,7 @@ export default function PlaylistsPage() {
 
     setCopying(true);
     try {
-      const res = await fetch(`/api/playlists/${selectedPlaylist.id}/copy-to`, {
+      const res = await fetch(`/spotify-tools/api/playlists/${selectedPlaylist.id}/copy-to`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

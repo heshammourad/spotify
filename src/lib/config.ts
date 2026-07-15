@@ -14,9 +14,9 @@ export const getRedirectUri = (reqHeaders?: {
   if (host) {
     const protocol = reqHeaders?.forwardedProto || 
       (host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https");
-    return `${protocol}://${host}/api/auth/callback`;
+    return `${protocol}://${host}/spotify-tools/api/auth/callback`;
   }
-  return "https://example.org/callback"; // Fallback
+  return "https://example.org/spotify-tools/api/auth/callback"; // Fallback
 };
 
 export const SCOPES = [

@@ -30,7 +30,7 @@ export default async function HomePage() {
           </p>
         </div>
 
-        <a href="/api/auth/login" className="btn btn-primary" id="login-button" style={{ padding: "16px 36px", fontSize: "1.05rem" }}>
+        <a href="/spotify-tools/api/auth/login" className="btn btn-primary" id="login-button" style={{ padding: "16px 36px", fontSize: "1.05rem" }}>
           Connect with Spotify
         </a>
 

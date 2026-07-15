@@ -60,7 +60,7 @@ export default async function RootLayout({
                   <span>{session.user.name}</span>
                 </div>
                 
-                <a href="/api/auth/logout" className="btn-icon" id="logout-button" title="Log Out">
+                <a href="/spotify-tools/api/auth/logout" className="btn-icon" id="logout-button" title="Log Out">
                   <LogOut size={16} style={{ color: "var(--danger)" }} />
                 </a>
               </div>
