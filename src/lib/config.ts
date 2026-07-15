@@ -1,7 +1,11 @@
 export const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || "1a8e8e375a4145c0b67e51b893fb07b1";
 export const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "c5db802b1b3f47e28d3f72162ea7fde4";
 
-export const BASE_PATH = "/spotify-tools";
+const rawPrefix = process.env.NEXT_PUBLIC_SUBPATH_PREFIX || "";
+
+export const BASE_PATH = rawPrefix
+  ? (rawPrefix.startsWith("/") ? rawPrefix : `/${rawPrefix}`).replace(/\/$/, "")
+  : "";
 
 export const getRedirectUri = (reqHeaders?: { 
   host: string | null; 

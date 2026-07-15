@@ -1,9 +1,20 @@
 import type { NextConfig } from "next";
+import { BASE_PATH } from "./src/lib/config";
 
 const nextConfig: NextConfig = {
-  basePath: "/spotify-tools",
+  basePath: BASE_PATH || undefined,
   skipTrailingSlashRedirect: true,
-  /* config options here */
+  async redirects() {
+    if (!BASE_PATH) return [];
+    return [
+      {
+        source: "/",
+        destination: BASE_PATH,
+        permanent: false,
+        basePath: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
