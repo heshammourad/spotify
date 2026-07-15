@@ -5,7 +5,9 @@ export function proxy(request: NextRequest) {
   const host = request.headers.get("host");
   const isProduction = process.env.NODE_ENV === "production";
 
-  if (isProduction && host && host !== "heshammourad.com") {
+  const fromPortal = request.headers.get("x-from-portal") === "true";
+
+  if (isProduction && !fromPortal && host && host !== "heshammourad.com") {
     const isVercelPreview = host.endsWith(".vercel.app") && host !== "heshammourad-spotify.vercel.app";
 
     if (!isVercelPreview) {
