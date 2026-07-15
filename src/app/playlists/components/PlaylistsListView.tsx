@@ -1,6 +1,7 @@
 "use client";
 
-import { Music, Search, X, Loader2, AlertTriangle, Globe, Lock, Users } from "lucide-react";
+import { Music, Search, X, AlertTriangle, Globe, Lock, Users } from "lucide-react";
+import CircularProgress from "@mui/material/CircularProgress";
 import Image from "next/image";
 import { SpotifyPlaylist } from "../types";
 
@@ -39,7 +40,7 @@ export function PlaylistsListView({
           disabled={loading}
           id="refresh-playlists-btn"
         >
-          {loading ? <Loader2 size={16} className="spin" /> : "Refresh Playlists"}
+          {loading ? <CircularProgress size={16} color="inherit" /> : "Refresh Playlists"}
         </button>
       </div>
 
@@ -68,7 +69,7 @@ export function PlaylistsListView({
       {/* Loading State */}
       {loading && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "100px 0", gap: "16px" }}>
-          <Loader2 size={48} className="spin" style={{ color: "var(--spotify-green)" }} />
+          <CircularProgress size={48} style={{ color: "var(--spotify-green)" }} />
           <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>Loading your Spotify playlists...</p>
         </div>
       )}

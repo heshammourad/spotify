@@ -2,11 +2,14 @@
 
 import { useState, useMemo } from "react";
 import { useFetchData } from "@/hooks/useFetchData";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import CircularProgress from "@mui/material/CircularProgress";
 import { RequestChart, RequestSong, SpotifySearchResult } from "./types";
 import { ToastNotification, ToastState } from "@/components/ToastNotification";
 import { ChartAccordionItem } from "./components/ChartAccordionItem";
 import { SyncActionPanel } from "./components/SyncActionPanel";
+import { AttentionSongRow } from "./components/AttentionSongRow";
+import { CustomConfirmationDialog } from "@/app/playlists/components/CustomConfirmationDialog";
 
 export default function UpdateChartsPage() {
   const [charts, setCharts] = useState<RequestChart[]>([]);
@@ -29,6 +32,20 @@ export default function UpdateChartsPage() {
   const [updatingPlaylists, setUpdatingPlaylists] = useState(false);
   const [updateLogs, setUpdateLogs] = useState<string[]>([]);
   const [updateCompleted, setUpdateCompleted] = useState(false);
+
+  // Custom Dialog Modal state
+  const [dialog, setDialog] = useState<{
+    isOpen: boolean;
+    type: "confirm" | "success" | "info" | "error";
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: "info",
+    title: "",
+    message: "",
+  });
 
   // Toast notification state
   const [toast, setToast] = useState<ToastState>({
@@ -60,11 +77,11 @@ export default function UpdateChartsPage() {
 
       setCharts(data.charts || []);
 
-      // Initialize expanded state (expand charts that are NOT up to date)
+      // Initialize expanded state (collapsed by default)
       const initialExpanded: Record<string, boolean> = {};
       const newSearchQueries = { ...searchQueries };
       data.charts?.forEach((c: RequestChart) => {
-        initialExpanded[c.id] = !c.isUpToDate;
+        initialExpanded[c.id] = false;
 
         // Pre-fill search inputs for each song
         c.songs.forEach((song) => {
@@ -140,18 +157,20 @@ export default function UpdateChartsPage() {
         throw new Error(`Mapping failed: ${res.statusText}`);
       }
 
-      // Update state locally
+      // Update state locally for all matching songs across all charts
       setCharts((prevCharts) =>
-        prevCharts.map((c) => {
-          if (c.id !== chartId) return c;
-          return {
-            ...c,
-            songs: c.songs.map((s) => {
-              if (s.rank !== song.rank) return s;
+        prevCharts.map((c) => ({
+          ...c,
+          songs: c.songs.map((s) => {
+            if (
+              s.title.toLowerCase().trim() === song.title.toLowerCase().trim() &&
+              s.artist.toLowerCase().trim() === song.artist.toLowerCase().trim()
+            ) {
               return { ...s, spotifyId, isMapped: true };
-            }),
-          };
-        })
+            }
+            return s;
+          }),
+        }))
       );
 
       // Clean search results
@@ -195,16 +214,18 @@ export default function UpdateChartsPage() {
   // Skip a song (stores empty mapping or sets isMapped to true with null id)
   const handleSkipSong = (chartId: string, song: RequestSong) => {
     setCharts((prevCharts) =>
-      prevCharts.map((c) => {
-        if (c.id !== chartId) return c;
-        return {
-          ...c,
-          songs: c.songs.map((s) => {
-            if (s.rank !== song.rank) return s;
+      prevCharts.map((c) => ({
+        ...c,
+        songs: c.songs.map((s) => {
+          if (
+            s.title.toLowerCase().trim() === song.title.toLowerCase().trim() &&
+            s.artist.toLowerCase().trim() === song.artist.toLowerCase().trim()
+          ) {
             return { ...s, spotifyId: "", isMapped: true }; // Empty string ID means skipped/unavailable
-          }),
-        };
-      })
+          }
+          return s;
+        }),
+      }))
     );
     showNotification("info", `Skipped track "${song.title}". It will not be added to playlists.`);
   };
@@ -212,16 +233,18 @@ export default function UpdateChartsPage() {
   // Reset/Change mapping
   const handleResetMapping = (chartId: string, song: RequestSong) => {
     setCharts((prevCharts) =>
-      prevCharts.map((c) => {
-        if (c.id !== chartId) return c;
-        return {
-          ...c,
-          songs: c.songs.map((s) => {
-            if (s.rank !== song.rank) return s;
+      prevCharts.map((c) => ({
+        ...c,
+        songs: c.songs.map((s) => {
+          if (
+            s.title.toLowerCase().trim() === song.title.toLowerCase().trim() &&
+            s.artist.toLowerCase().trim() === song.artist.toLowerCase().trim()
+          ) {
             return { ...s, spotifyId: null, isMapped: false };
-          }),
-        };
-      })
+          }
+          return s;
+        }),
+      }))
     );
   };
 
@@ -236,6 +259,43 @@ export default function UpdateChartsPage() {
     return count;
   }, [charts]);
 
+  // Deduplicated tracks needing attention
+  const attentionSongs = useMemo(() => {
+    const songMap = new Map<
+      string,
+      {
+        song: RequestSong;
+        charts: { id: string; name: string }[];
+        stateKey: string;
+        representativeChartId: string;
+      }
+    >();
+
+    charts.forEach((chart) => {
+      chart.songs.forEach((song) => {
+        if (!song.isMapped) {
+          const key = `${song.title.toLowerCase().trim()}|${song.artist.toLowerCase().trim()}`;
+          if (!songMap.has(key)) {
+            const stateKey = `${chart.id}-${song.rank}`;
+            songMap.set(key, {
+              song,
+              charts: [{ id: chart.id, name: chart.name }],
+              stateKey,
+              representativeChartId: chart.id,
+            });
+          } else {
+            const currentItem = songMap.get(key)!;
+            if (!currentItem.charts.some((c) => c.id === chart.id)) {
+              currentItem.charts.push({ id: chart.id, name: chart.name });
+            }
+          }
+        }
+      });
+    });
+
+    return Array.from(songMap.values());
+  }, [charts]);
+
   // Execute playlists update
   const handleExecuteUpdate = async () => {
     if (unresolvedSongsCount > 0) {
@@ -243,14 +303,16 @@ export default function UpdateChartsPage() {
       return;
     }
 
-    if (
-      !confirm(
-        "Are you sure you want to execute playlist updates? This will clear the Temp playlist and update Spotify playlists."
-      )
-    ) {
-      return;
-    }
+    setDialog({
+      isOpen: true,
+      type: "confirm",
+      title: "Sync Playlists",
+      message: "Are you sure you want to execute playlist updates? This will clear the Temp playlist and update Spotify playlists.",
+      onConfirm: executeUpdate,
+    });
+  };
 
+  const executeUpdate = async () => {
     setUpdatingPlaylists(true);
     setUpdateLogs(["Triggering playlist update backend execution..."]);
     setUpdateCompleted(false);
@@ -320,14 +382,14 @@ export default function UpdateChartsPage() {
           disabled={loading || updatingPlaylists}
           id="refetch-charts-btn"
         >
-          {loading ? <Loader2 size={16} className="spin" /> : "Refetch Charts"}
+          {loading ? <CircularProgress size={16} color="inherit" /> : "Refetch Charts"}
         </button>
       </div>
 
       {/* Loading state */}
       {loading && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "100px 0", gap: "16px" }}>
-          <Loader2 size={48} className="spin" style={{ color: "var(--spotify-green)" }} />
+          <CircularProgress size={48} style={{ color: "var(--spotify-green)" }} />
           <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
             Scraping Billboard charts &amp; loading database mappings...
           </p>
@@ -343,6 +405,65 @@ export default function UpdateChartsPage() {
           <button className="btn btn-primary" onClick={() => fetchCharts()}>
             Try Again
           </button>
+        </div>
+      )}
+
+      {/* Tracks Needing Attention Panel */}
+      {!loading && !error && attentionSongs.length > 0 && (
+        <div
+          className="glass-panel"
+          style={{ display: "flex", flexDirection: "column", gap: "16px", border: "1px solid rgba(233, 20, 41, 0.2)" }}
+          id="attention-panel"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span className="badge badge-danger" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+              <AlertTriangle size={12} /> Attention Required
+            </span>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>Unmapped Songs ({attentionSongs.length})</h2>
+          </div>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+            The following new songs are in your active charts but are not yet mapped to Spotify. Resolving them here will map them across all charts they appear in.
+          </p>
+          <div className="table-container" style={{ maxHeight: "400px", overflowY: "auto" }}>
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>Song</th>
+                  <th>Appears In</th>
+                  <th style={{ width: "280px" }}>Spotify Mapping</th>
+                  <th style={{ width: "125px" }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attentionSongs.map(({ song, charts: songCharts, stateKey, representativeChartId }) => (
+                  <AttentionSongRow
+                    key={stateKey}
+                    song={song}
+                    appearsInCharts={songCharts}
+                    stateKey={stateKey}
+                    representativeChartId={representativeChartId}
+                    searchQuery={searchQueries[stateKey] || ""}
+                    searchResults={searchResults[stateKey] || []}
+                    isSearching={searching[stateKey] || false}
+                    manualLink={manualLinks[stateKey] || ""}
+                    onSearchQueryChange={(key, q) => setSearchQueries((prev) => ({ ...prev, [key]: q }))}
+                    onManualLinkChange={(key, link) => setManualLinks((prev) => ({ ...prev, [key]: link }))}
+                    onSearchSong={handleSearchSong}
+                    onMapSong={handleMapSong}
+                    onManualMap={handleManualMap}
+                    onSkipSong={handleSkipSong}
+                    onClearSearchResults={(key) =>
+                      setSearchResults((prev) => {
+                        const copy = { ...prev };
+                        delete copy[key];
+                        return copy;
+                      })
+                    }
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -390,6 +511,12 @@ export default function UpdateChartsPage() {
           onExecuteUpdate={handleExecuteUpdate}
         />
       )}
+
+      {/* Custom Confirmation / Alert Dialog Modal */}
+      <CustomConfirmationDialog
+        dialog={dialog}
+        onClose={() => setDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft, Music, Globe, Lock, Users, Copy, Trash2, Loader2, AlertTriangle, ExternalLink } from "lucide-react";
+import { ArrowLeft, Music, Globe, Lock, Users, Copy, Trash2, AlertTriangle, ExternalLink } from "lucide-react";
+import CircularProgress from "@mui/material/CircularProgress";
 import Image from "next/image";
 import { SpotifyPlaylist, SpotifyTrack } from "../types";
 
@@ -142,7 +143,7 @@ export function PlaylistDetailView({
                   disabled={loadingTracks || deduplicating || tracks.length === 0}
                   id="playlist-action-dedup"
                 >
-                  {deduplicating ? <Loader2 size={16} className="spin" /> : <Trash2 size={16} />}
+                  {deduplicating ? <CircularProgress size={16} color="inherit" /> : <Trash2 size={16} />}
                   Remove Duplicates
                 </button>
               ) : (
@@ -163,7 +164,7 @@ export function PlaylistDetailView({
       <div className="glass-panel" style={{ padding: "24px" }} id="modal-tracks-container">
         {loadingTracks && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "60px 0", gap: "12px" }}>
-            <Loader2 size={36} className="spin" style={{ color: "var(--spotify-green)" }} />
+            <CircularProgress size={36} style={{ color: "var(--spotify-green)" }} />
             <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>Fetching tracks...</p>
           </div>
         )}

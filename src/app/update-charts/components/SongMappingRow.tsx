@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, ExternalLink, Search, Loader2, Save, X, Plus, Music } from "lucide-react";
+import { Check, ExternalLink, Search, Save, X, Plus, Music } from "lucide-react";
+import CircularProgress from "@mui/material/CircularProgress";
 import Image from "next/image";
 import { RequestSong, SpotifySearchResult } from "../types";
 
@@ -119,7 +120,7 @@ export function SongMappingRow({
                 disabled={isSearching}
                 id={`search-btn-${songKey}`}
               >
-                {isSearching ? <Loader2 size={12} className="spin" /> : <Search size={12} />}
+                {isSearching ? <CircularProgress size={12} color="inherit" /> : <Search size={12} />}
               </button>
             </div>
 

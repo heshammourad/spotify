@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { getSession } from "@/lib/session";
 import Link from "next/link";
+import Image from "next/image";
 import { Music, RefreshCw, LogOut, Disc } from "lucide-react";
 
 const inter = Inter({
@@ -45,7 +46,7 @@ export default async function RootLayout({
                 
                 <div className="user-profile-badge" id="user-badge">
                   {session.user.image ? (
-                    <img src={session.user.image} alt={session.user.name} />
+                    <Image src={session.user.image} alt={session.user.name} width={24} height={24} unoptimized />
                   ) : (
                     <div style={{
                       width: 24, height: 24, borderRadius: "50%",

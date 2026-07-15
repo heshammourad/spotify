@@ -1,6 +1,7 @@
 "use client";
 
-import { Globe, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
+import { Globe, AlertTriangle, ArrowRight, Terminal } from "lucide-react";
+import CircularProgress from "@mui/material/CircularProgress";
 
 interface SyncActionPanelProps {
   spotifyNumberOne: string;
@@ -107,7 +108,7 @@ export function SyncActionPanel({
         >
           {updatingPlaylists ? (
             <>
-              <Loader2 size={20} className="spin" /> Updating Playlists...
+              <CircularProgress size={20} color="inherit" /> Updating Playlists...
             </>
           ) : (
             <>
@@ -139,11 +140,11 @@ export function SyncActionPanel({
                 gap: "8px",
               }}
             >
-              <Loader2
-                size={16}
-                className={updatingPlaylists ? "spin" : ""}
-                style={{ color: updatingPlaylists ? "var(--spotify-green)" : "var(--text-secondary)" }}
-              />
+              {updatingPlaylists ? (
+                <CircularProgress size={16} style={{ color: "var(--spotify-green)" }} />
+              ) : (
+                <Terminal size={16} style={{ color: "var(--text-secondary)" }} />
+              )}
               Execution Logs
             </h3>
             {updateCompleted && <span className="badge badge-success">Completed Successfully</span>}

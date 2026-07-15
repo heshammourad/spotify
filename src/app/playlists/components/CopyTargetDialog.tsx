@@ -2,7 +2,8 @@
 
 import Dialog from "@mui/material/Dialog";
 import Image from "next/image";
-import { Search, X, Loader2, Music } from "lucide-react";
+import { Search, X, Music } from "lucide-react";
+import CircularProgress from "@mui/material/CircularProgress";
 import { SpotifyPlaylist } from "../types";
 
 interface CopyTargetDialogProps {
@@ -140,7 +141,7 @@ export function CopyTargetDialog({
         >
           {copying ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 0", gap: "12px" }}>
-              <Loader2 size={32} className="spin" style={{ color: "var(--spotify-green)" }} />
+              <CircularProgress size={32} style={{ color: "var(--spotify-green)" }} />
               <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", margin: 0 }}>Copying songs...</p>
             </div>
           ) : (
