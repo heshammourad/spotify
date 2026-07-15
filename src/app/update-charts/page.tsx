@@ -10,6 +10,7 @@ import { ChartAccordionItem } from "./components/ChartAccordionItem";
 import { SyncActionPanel } from "./components/SyncActionPanel";
 import { AttentionSongRow } from "./components/AttentionSongRow";
 import { CustomConfirmationDialog } from "@/app/playlists/components/CustomConfirmationDialog";
+import { BASE_PATH } from "@/lib/config";
 
 export default function UpdateChartsPage() {
   const [charts, setCharts] = useState<RequestChart[]>([]);
@@ -69,7 +70,7 @@ export default function UpdateChartsPage() {
       setUpdateCompleted(false);
       setUpdateLogs([]);
 
-      const res = await fetch("/spotify-tools/api/charts");
+      const res = await fetch(`${BASE_PATH}/api/charts`);
       if (!res.ok) {
         throw new Error(`Failed to load charts data: ${res.statusText}`);
       }
@@ -117,7 +118,7 @@ export default function UpdateChartsPage() {
 
     setSearching((prev) => ({ ...prev, [songKey]: true }));
     try {
-      const res = await fetch(`/spotify-tools/api/charts/search?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`${BASE_PATH}/api/charts/search?q=${encodeURIComponent(query)}`);
       if (!res.ok) {
         throw new Error(`Search failed: ${res.statusText}`);
       }
@@ -141,7 +142,7 @@ export default function UpdateChartsPage() {
     const songKey = `${chartId}-${song.rank}`;
 
     try {
-      const res = await fetch("/spotify-tools/api/charts/map", {
+      const res = await fetch(`${BASE_PATH}/api/charts/map`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -330,7 +331,7 @@ export default function UpdateChartsPage() {
         })),
       }));
 
-      const res = await fetch("/spotify-tools/api/charts/update-playlists", {
+      const res = await fetch(`${BASE_PATH}/api/charts/update-playlists`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

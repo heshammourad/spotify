@@ -1,6 +1,8 @@
 export const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || "1a8e8e375a4145c0b67e51b893fb07b1";
 export const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "c5db802b1b3f47e28d3f72162ea7fde4";
 
+export const BASE_PATH = "/spotify-tools";
+
 export const getRedirectUri = (reqHeaders?: { 
   host: string | null; 
   forwardedHost?: string | null; 
@@ -14,9 +16,9 @@ export const getRedirectUri = (reqHeaders?: {
   if (host) {
     const protocol = reqHeaders?.forwardedProto || 
       (host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https");
-    return `${protocol}://${host}/spotify-tools/api/auth/callback`;
+    return `${protocol}://${host}${BASE_PATH}/api/auth/callback`;
   }
-  return "https://example.org/spotify-tools/api/auth/callback"; // Fallback
+  return `https://example.org${BASE_PATH}/api/auth/callback`; // Fallback
 };
 
 export const SCOPES = [

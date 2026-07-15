@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/session";
 import Link from "next/link";
 import { Music, RefreshCw, Layers, CheckCircle2, ChevronRight, Disc } from "lucide-react";
+import { BASE_PATH } from "@/lib/config";
 
 export default async function HomePage() {
   const session = await getSession();
@@ -30,7 +31,7 @@ export default async function HomePage() {
           </p>
         </div>
 
-        <a href="/spotify-tools/api/auth/login" className="btn btn-primary" id="login-button" style={{ padding: "16px 36px", fontSize: "1.05rem" }}>
+        <a href={`${BASE_PATH}/api/auth/login`} className="btn btn-primary" id="login-button" style={{ padding: "16px 36px", fontSize: "1.05rem" }}>
           Connect with Spotify
         </a>
 

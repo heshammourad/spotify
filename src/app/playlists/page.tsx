@@ -8,6 +8,7 @@ import { PlaylistsListView } from "./components/PlaylistsListView";
 import { PlaylistDetailView } from "./components/PlaylistDetailView";
 import { CopyTargetDialog } from "./components/CopyTargetDialog";
 import { CustomConfirmationDialog } from "./components/CustomConfirmationDialog";
+import { BASE_PATH } from "@/lib/config";
 
 export default function PlaylistsPage() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
@@ -68,7 +69,7 @@ export default function PlaylistsPage() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch("/spotify-tools/api/playlists");
+        const res = await fetch(`${BASE_PATH}/api/playlists`);
         if (!res.ok) {
           throw new Error(`Failed to load playlists: ${res.statusText}`);
         }
@@ -107,7 +108,7 @@ export default function PlaylistsPage() {
     setTracks([]);
 
     try {
-      const res = await fetch(`/spotify-tools/api/playlists/${playlist.id}`);
+      const res = await fetch(`${BASE_PATH}/api/playlists/${playlist.id}`);
       if (!res.ok) {
         throw new Error(`Failed to fetch playlist tracks: ${res.statusText}`);
       }
@@ -131,7 +132,7 @@ export default function PlaylistsPage() {
   const executeRemoveDuplicates = async (playlist: SpotifyPlaylist) => {
     setDeduplicating(true);
     try {
-      const res = await fetch(`/spotify-tools/api/playlists/${playlist.id}/remove-duplicates`, {
+      const res = await fetch(`${BASE_PATH}/api/playlists/${playlist.id}/remove-duplicates`, {
         method: "POST",
       });
 
@@ -201,7 +202,7 @@ export default function PlaylistsPage() {
 
     setCopying(true);
     try {
-      const res = await fetch(`/spotify-tools/api/playlists/${selectedPlaylist.id}/copy-to`, {
+      const res = await fetch(`${BASE_PATH}/api/playlists/${selectedPlaylist.id}/copy-to`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

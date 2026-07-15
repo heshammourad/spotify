@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { SpotifySession } from "@/lib/session";
-import { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, getRedirectUri } from "@/lib/config";
+import { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, getRedirectUri, BASE_PATH } from "@/lib/config";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -21,16 +21,16 @@ export async function GET(request: Request) {
   const baseUrl = `${baseProto}://${baseHost}`;
 
   // Clean up state cookie
-  const response = NextResponse.redirect(new URL("/spotify-tools", baseUrl));
+  const response = NextResponse.redirect(new URL(BASE_PATH, baseUrl));
   response.cookies.delete("spotify_auth_state");
 
   if (error) {
     console.error("Spotify OAuth error:", error);
-    return NextResponse.redirect(new URL(`/spotify-tools?error=${encodeURIComponent(error)}`, baseUrl));
+    return NextResponse.redirect(new URL(`${BASE_PATH}?error=${encodeURIComponent(error)}`, baseUrl));
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL("/spotify-tools?error=missing_code", baseUrl));
+    return NextResponse.redirect(new URL(`${BASE_PATH}?error=missing_code`, baseUrl));
   }
 
   // State verification (optional, but let's do a simple check if both exist)
@@ -130,6 +130,6 @@ export async function GET(request: Request) {
     const baseHost = forwardedHost || host || "localhost:3000";
     const baseProto = forwardedProto || (baseHost.includes("localhost") || baseHost.includes("127.0.0.1") ? "http" : "https");
     const baseUrl = `${baseProto}://${baseHost}`;
-    return NextResponse.redirect(new URL("/spotify-tools?error=auth_failed", baseUrl));
+    return NextResponse.redirect(new URL(`${BASE_PATH}?error=auth_failed`, baseUrl));
   }
 }
