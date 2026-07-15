@@ -1,10 +1,9 @@
-import sqlite3 from "sqlite3";
-import { open, Database as SqliteDatabase } from "sqlite";
 import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
+import type { Database as SqliteDatabase } from "sqlite";
 
-let sqliteDb: SqliteDatabase | null = null;
+let sqliteDb: any = null;
 let pgPool: Pool | null = null;
 
 // Determine SQLite path: try sharing with python-playground, fallback to local/tmp
@@ -62,6 +61,9 @@ async function getDb() {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
+
+      const sqlite3 = (await import("sqlite3")).default;
+      const { open } = await import("sqlite");
 
       sqliteDb = await open({
         filename: sqlitePath,
