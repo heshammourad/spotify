@@ -16,7 +16,7 @@ export async function POST(
   const sourcePlaylistId = resolvedParams.id;
 
   try {
-    const { targetPlaylistId } = await request.json();
+    const { targetPlaylistId, allowDuplicates } = await request.json();
 
     if (!targetPlaylistId) {
       return NextResponse.json({ error: "Missing targetPlaylistId parameter" }, { status: 400 });
@@ -30,7 +30,8 @@ export async function POST(
     const result = await copyTracksToPlaylist(
       session.accessToken,
       [sourcePlaylistId],
-      targetPlaylistId
+      targetPlaylistId,
+      Boolean(allowDuplicates)
     );
 
     return NextResponse.json({

@@ -15,6 +15,8 @@ interface CopyTargetDialogProps {
   onTargetSearchQueryChange: (q: string) => void;
   writeablePlaylists: SpotifyPlaylist[];
   onCopyTracks: (target: SpotifyPlaylist) => Promise<void>;
+  allowDuplicates: boolean;
+  onAllowDuplicatesChange: (allow: boolean) => void;
 }
 
 export function CopyTargetDialog({
@@ -26,6 +28,8 @@ export function CopyTargetDialog({
   onTargetSearchQueryChange,
   writeablePlaylists,
   onCopyTracks,
+  allowDuplicates,
+  onAllowDuplicatesChange,
 }: CopyTargetDialogProps) {
   return (
     <Dialog
@@ -94,8 +98,44 @@ export function CopyTargetDialog({
         }}
       >
         <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0 }}>
-          Select a target playlist to copy these songs into. We&apos;ll automatically filter out duplicates.
+          {allowDuplicates
+            ? "Select a target playlist to copy all songs into (including duplicate songs already in target)."
+            : "Select a target playlist to copy these songs into. We\u0026apos;ll automatically filter out duplicates."}
         </p>
+
+        {/* Option to allow duplicates */}
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            fontSize: "0.85rem",
+            color: "var(--text-primary)",
+            cursor: "pointer",
+            userSelect: "none",
+            background: "rgba(255, 255, 255, 0.04)",
+            padding: "10px 14px",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--border)",
+            transition: "var(--transition)",
+          }}
+          id="copy-allow-duplicates-option"
+        >
+          <input
+            type="checkbox"
+            checked={allowDuplicates}
+            onChange={(e) => onAllowDuplicatesChange(e.target.checked)}
+            disabled={copying}
+            style={{
+              accentColor: "var(--spotify-green)",
+              width: "16px",
+              height: "16px",
+              cursor: "pointer",
+            }}
+            id="copy-allow-duplicates-checkbox"
+          />
+          <span>Copy all songs (include duplicates already in target)</span>
+        </label>
 
         {/* Search target lists */}
         <div

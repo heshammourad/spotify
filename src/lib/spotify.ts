@@ -345,15 +345,21 @@ export async function removePlaylistTracks(
 export async function copyTracksToPlaylist(
   accessToken: string,
   sourcePlaylistIds: string[],
-  targetPlaylistId: string
+  targetPlaylistId: string,
+  allowDuplicates: boolean = false
 ): Promise<{ totalCopied: number; details: string[] }> {
   const logDetails: string[] = [];
   logDetails.push(`Starting copy operation to target playlist: ${targetPlaylistId}`);
 
-  // 1. Fetch tracks from the target playlist ONCE
-  logDetails.push("Fetching existing tracks from the target playlist...");
-  const targetTracks = await getPlaylistTracks(accessToken, targetPlaylistId);
-  const existingTargetTrackUris = new Set(targetTracks.map((t) => t.uri));
+  let existingTargetTrackUris = new Set<string>();
+  if (!allowDuplicates) {
+    // 1. Fetch tracks from the target playlist ONCE
+    logDetails.push("Fetching existing tracks from the target playlist...");
+    const targetTracks = await getPlaylistTracks(accessToken, targetPlaylistId);
+    existingTargetTrackUris = new Set(targetTracks.map((t) => t.uri));
+  } else {
+    logDetails.push("Allowing duplicates (copying all tracks without filtering)...");
+  }
 
   let totalAddedCount = 0;
 
@@ -389,29 +395,35 @@ export async function copyTracksToPlaylist(
     // Extract URIs
     const currentSourceUris = sourceTracks.map((t) => t.uri);
     
-    // Filter out duplicates (already in target)
-    const tracksToAddUris = currentSourceUris.filter((uri) => !existingTargetTrackUris.has(uri));
+    let tracksToAddUris: string[];
+    if (allowDuplicates) {
+      tracksToAddUris = currentSourceUris;
+    } else {
+      // Filter out duplicates (already in target)
+      const nonDuplicateUris = currentSourceUris.filter((uri) => !existingTargetTrackUris.has(uri));
+      // Remove duplicates within the source playlist itself to avoid inserting the same track twice
+      tracksToAddUris = Array.from(new Set(nonDuplicateUris));
+    }
 
-    // Remove duplicates within the source playlist itself to avoid inserting the same track twice
-    const uniqueTracksToAddUris = Array.from(new Set(tracksToAddUris));
-
-    if (uniqueTracksToAddUris.length === 0) {
+    if (tracksToAddUris.length === 0) {
       logDetails.push(`  All tracks from '${sourcePlaylistName}' already exist in the target. No new tracks to copy.`);
       continue;
     }
 
-    logDetails.push(`  Identified ${uniqueTracksToAddUris.length} new track(s) from '${sourcePlaylistName}' to add.`);
+    logDetails.push(`  Identified ${tracksToAddUris.length} track(s) from '${sourcePlaylistName}' to add.`);
 
     // Batch add to target playlist
-    const addedCount = await addTracksInBatches(accessToken, targetPlaylistId, uniqueTracksToAddUris);
+    const addedCount = await addTracksInBatches(accessToken, targetPlaylistId, tracksToAddUris);
     totalAddedCount += addedCount;
     logDetails.push(`  Successfully copied ${addedCount} track(s) from '${sourcePlaylistName}'.`);
 
     // Update existing target URIs to avoid duplicates in subsequent sources
-    uniqueTracksToAddUris.forEach((uri) => existingTargetTrackUris.add(uri));
+    if (!allowDuplicates) {
+      tracksToAddUris.forEach((uri) => existingTargetTrackUris.add(uri));
+    }
   }
 
-  logDetails.push(`Copy operation completed. Total ${totalAddedCount} new tracks added.`);
+  logDetails.push(`Copy operation completed. Total ${totalAddedCount} tracks added.`);
   
   return {
     totalCopied: totalAddedCount,

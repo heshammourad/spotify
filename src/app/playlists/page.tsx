@@ -29,6 +29,7 @@ export default function PlaylistsPage() {
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [copying, setCopying] = useState(false);
   const [targetSearchQuery, setTargetSearchQuery] = useState("");
+  const [allowDuplicates, setAllowDuplicates] = useState(false);
 
   // Deduplication state
   const [deduplicating, setDeduplicating] = useState(false);
@@ -194,6 +195,7 @@ export default function PlaylistsPage() {
   const handleOpenCopyPicker = () => {
     setIsCopyModalOpen(true);
     setTargetSearchQuery("");
+    setAllowDuplicates(false);
   };
 
   // Execute Copy Tracks
@@ -209,6 +211,7 @@ export default function PlaylistsPage() {
         },
         body: JSON.stringify({
           targetPlaylistId: targetPlaylist.id,
+          allowDuplicates,
         }),
       });
 
@@ -219,7 +222,7 @@ export default function PlaylistsPage() {
       const data = await res.json();
 
       if (data.copiedCount > 0) {
-        showNotification("success", `Copied ${data.copiedCount} new song(s) to "${targetPlaylist.name}"!`);
+        showNotification("success", `Copied ${data.copiedCount} song(s) to "${targetPlaylist.name}"!`);
         setIsCopyModalOpen(false);
         // Update target playlist count in local state to bypass stale cache
         setPlaylists((prevPlaylists) =>
@@ -304,6 +307,8 @@ export default function PlaylistsPage() {
         onTargetSearchQueryChange={setTargetSearchQuery}
         writeablePlaylists={writeablePlaylists}
         onCopyTracks={handleCopyTracks}
+        allowDuplicates={allowDuplicates}
+        onAllowDuplicatesChange={setAllowDuplicates}
       />
 
       {/* Custom Confirmation / Alert Dialog Modal */}
