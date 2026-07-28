@@ -237,6 +237,39 @@ export async function addTracksInBatches(
   return addedCount;
 }
 
+// Replace all tracks in playlist with a new ordered list of URIs
+export async function reorderPlaylistTracks(
+  accessToken: string,
+  playlistId: string,
+  trackUris: string[]
+): Promise<number> {
+  if (trackUris.length === 0) {
+    await spotifyFetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, accessToken, {
+      method: "PUT",
+      body: JSON.stringify({ uris: [] }),
+    });
+    return 0;
+  }
+
+  // Spotify PUT endpoint replaces items (up to 100)
+  const firstBatch = trackUris.slice(0, 100);
+  await spotifyFetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify({
+      uris: firstBatch,
+    }),
+  });
+
+  // If there are more than 100 tracks, append the remaining in batches of 100
+  if (trackUris.length > 100) {
+    const remainingUris = trackUris.slice(100);
+    await addTracksInBatches(accessToken, playlistId, remainingUris);
+  }
+
+  return trackUris.length;
+}
+
+
 // Add/Position a track in a playlist (exact implementation of add_track_to_playlist from client.py)
 export async function addTrackToPlaylist(
   accessToken: string,

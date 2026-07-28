@@ -1,9 +1,27 @@
 "use client";
 
-import { ArrowLeft, Music, Globe, Lock, Users, Copy, Trash2, AlertTriangle, ExternalLink } from "lucide-react";
+import { useState, useMemo } from "react";
+import {
+  ArrowLeft,
+  Music,
+  Globe,
+  Lock,
+  Users,
+  Copy,
+  Trash2,
+  AlertTriangle,
+  ExternalLink,
+  Sparkles,
+  ArrowUpDown,
+  RotateCcw,
+  Save,
+} from "lucide-react";
 import CircularProgress from "@mui/material/CircularProgress";
 import Image from "next/image";
 import { SpotifyPlaylist, SpotifyTrack } from "../types";
+import { smartOrderTracks } from "@/lib/smartOrder";
+
+export type SortMode = "original" | "artist_separation" | "title" | "artist";
 
 interface PlaylistDetailViewProps {
   selectedPlaylist: SpotifyPlaylist;
@@ -15,6 +33,8 @@ interface PlaylistDetailViewProps {
   onOpenCopyPicker: () => void;
   onRemoveDuplicates: () => void;
   deduplicating: boolean;
+  onSaveOrder?: (reorderedTracks: SpotifyTrack[]) => void;
+  savingOrder?: boolean;
 }
 
 export function PlaylistDetailView({
@@ -27,7 +47,11 @@ export function PlaylistDetailView({
   onOpenCopyPicker,
   onRemoveDuplicates,
   deduplicating,
+  onSaveOrder,
+  savingOrder = false,
 }: PlaylistDetailViewProps) {
+  const [sortMode, setSortMode] = useState<SortMode>("original");
+
   // Format date helper
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "-";
@@ -36,6 +60,26 @@ export function PlaylistDetailView({
   };
 
   const hasWriteAccess = selectedPlaylist.owner.id === userId || selectedPlaylist.collaborative;
+
+  // Compute sorted tracks based on selected sort mode
+  const displayTracks = useMemo(() => {
+    if (sortMode === "artist_separation") {
+      return smartOrderTracks(tracks);
+    }
+    if (sortMode === "title") {
+      return [...tracks].sort((a, b) => a.title.localeCompare(b.title));
+    }
+    if (sortMode === "artist") {
+      return [...tracks].sort((a, b) => {
+        const artistA = a.artists[0] || "";
+        const artistB = b.artists[0] || "";
+        return artistA.localeCompare(artistB);
+      });
+    }
+    return tracks;
+  }, [tracks, sortMode]);
+
+  const isModifiedOrder = sortMode !== "original";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }} className="animated-fade-in" id="playlist-detail-page">
@@ -125,7 +169,19 @@ export function PlaylistDetailView({
             </p>
 
             {/* Action buttons */}
-            <div style={{ display: "flex", gap: "10px" }}>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {/* Artist Separation quick button */}
+              <button
+                className={`btn ${sortMode === "artist_separation" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setSortMode(sortMode === "artist_separation" ? "original" : "artist_separation")}
+                disabled={loadingTracks || tracks.length === 0}
+                id="playlist-action-artist-separation"
+                title="Sort tracks so artists are evenly distributed throughout the playlist"
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+              >
+                <Sparkles size={16} /> Artist Separation
+              </button>
+
               <button
                 className="btn btn-secondary"
                 onClick={onOpenCopyPicker}
@@ -161,7 +217,98 @@ export function PlaylistDetailView({
       </div>
 
       {/* Tracks List Container */}
-      <div className="glass-panel" style={{ padding: "24px" }} id="modal-tracks-container">
+      <div className="glass-panel" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }} id="modal-tracks-container">
+        {/* Sorting & Filter Header Controls */}
+        {!loadingTracks && !tracksError && tracks.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "12px",
+              paddingBottom: "12px",
+              borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                <ArrowUpDown size={14} /> Sort By:
+              </span>
+
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as SortMode)}
+                style={{
+                  background: "rgba(255, 255, 255, 0.05)",
+                  color: "var(--text-main)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "6px 12px",
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  outline: "none",
+                }}
+                id="sort-mode-select"
+              >
+                <option value="original" style={{ background: "#1a1a24" }}>Original Spotify Order</option>
+                <option value="artist_separation" style={{ background: "#1a1a24" }}>✨ Artist Separation (Smart Order)</option>
+                <option value="title" style={{ background: "#1a1a24" }}>Track Title (A-Z)</option>
+                <option value="artist" style={{ background: "#1a1a24" }}>Artist Name (A-Z)</option>
+              </select>
+
+              {isModifiedOrder && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setSortMode("original")}
+                  style={{ padding: "4px 10px", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                  id="reset-sort-btn"
+                >
+                  <RotateCcw size={12} /> Reset Order
+                </button>
+              )}
+            </div>
+
+            {/* Save Order to Spotify Button */}
+            {hasWriteAccess && isModifiedOrder && onSaveOrder && (
+              <button
+                className="btn btn-primary"
+                onClick={() => onSaveOrder(displayTracks)}
+                disabled={savingOrder}
+                style={{ padding: "8px 16px", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                id="save-order-spotify-btn"
+              >
+                {savingOrder ? <CircularProgress size={14} color="inherit" /> : <Save size={14} />}
+                Save New Order to Spotify
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Info Banner when Artist Separation is active */}
+        {sortMode === "artist_separation" && !loadingTracks && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: "var(--radius-md)",
+              background: "rgba(29, 185, 84, 0.1)",
+              border: "1px solid rgba(29, 185, 84, 0.3)",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              fontSize: "0.85rem",
+              color: "var(--spotify-green)",
+            }}
+            id="artist-separation-banner"
+          >
+            <Sparkles size={18} style={{ flexShrink: 0 }} />
+            <div>
+              <strong>Artist Separation Active:</strong> Tracks are rearranged to maximize spacing between songs by the same artist using the SortYourMusic smart-order algorithm.
+              {hasWriteAccess ? " Click 'Save New Order to Spotify' above to apply this order to your playlist." : ""}
+            </div>
+          </div>
+        )}
+
         {loadingTracks && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "60px 0", gap: "12px" }}>
             <CircularProgress size={36} style={{ color: "var(--spotify-green)" }} />
@@ -178,7 +325,7 @@ export function PlaylistDetailView({
 
         {!loadingTracks && !tracksError && (
           <>
-            {tracks.length === 0 ? (
+            {displayTracks.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-secondary)" }}>
                 No songs in this playlist.
               </div>
@@ -194,7 +341,7 @@ export function PlaylistDetailView({
                     </tr>
                   </thead>
                   <tbody>
-                    {tracks.map((track, idx) => (
+                    {displayTracks.map((track, idx) => (
                       <tr key={`${track.id}-${idx}`}>
                         <td style={{ color: "var(--text-muted)" }}>{idx + 1}</td>
                         <td style={{ fontWeight: 600 }}>

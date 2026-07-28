@@ -34,6 +34,9 @@ export default function PlaylistsPage() {
   // Deduplication state
   const [deduplicating, setDeduplicating] = useState(false);
 
+  // Track reorder state
+  const [savingOrder, setSavingOrder] = useState(false);
+
   // Custom Dialog Modal state
   const [dialog, setDialog] = useState<{
     isOpen: boolean;
@@ -191,6 +194,62 @@ export default function PlaylistsPage() {
     });
   };
 
+  // Execute Save Order to Spotify
+  const executeSaveOrder = async (playlist: SpotifyPlaylist, reorderedTracks: SpotifyTrack[]) => {
+    setSavingOrder(true);
+    try {
+      const res = await fetch(`${BASE_PATH}/api/playlists/${playlist.id}/reorder`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          trackUris: reorderedTracks.map((t) => t.uri),
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Save track order request failed: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      showNotification("success", `Updated track order for "${playlist.name}" on Spotify!`);
+      setDialog({
+        isOpen: true,
+        type: "success",
+        title: "Order Saved",
+        message: `Successfully saved new track order (${data.reorderedCount || reorderedTracks.length} tracks) to "${playlist.name}" on Spotify.`,
+      });
+      // Refresh playlist tracks
+      handleOpenPlaylist(playlist);
+    } catch (err) {
+      console.error(err);
+      const msg = err instanceof Error ? err.message : "Failed to save track order.";
+      setDialog({
+        isOpen: true,
+        type: "error",
+        title: "Save Order Failed",
+        message: msg,
+      });
+      showNotification("error", msg);
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
+  // Save Order Handler
+  const handleSaveOrder = (reorderedTracks: SpotifyTrack[]) => {
+    if (!selectedPlaylist) return;
+
+    setDialog({
+      isOpen: true,
+      type: "confirm",
+      title: "Save Track Order to Spotify",
+      message: `Are you sure you want to apply this new track order to "${selectedPlaylist.name}" on Spotify?`,
+      onConfirm: () => executeSaveOrder(selectedPlaylist, reorderedTracks),
+    });
+  };
+
   // Open Copy Target Picker
   const handleOpenCopyPicker = () => {
     setIsCopyModalOpen(true);
@@ -283,6 +342,8 @@ export default function PlaylistsPage() {
           onOpenCopyPicker={handleOpenCopyPicker}
           onRemoveDuplicates={handleRemoveDuplicates}
           deduplicating={deduplicating}
+          onSaveOrder={handleSaveOrder}
+          savingOrder={savingOrder}
         />
       ) : (
         /* Playlists Grid List Page */
