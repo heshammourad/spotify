@@ -195,7 +195,7 @@ export default function PlaylistsPage() {
   };
 
   // Execute Save Order to Spotify
-  const executeSaveOrder = async (playlist: SpotifyPlaylist, reorderedTracks: SpotifyTrack[]) => {
+  const executeSaveOrder = async (playlist: SpotifyPlaylist, reorderedTracks: SpotifyTrack[], sortMode?: string) => {
     setSavingOrder(true);
     try {
       const res = await fetch(`${BASE_PATH}/api/playlists/${playlist.id}/reorder`, {
@@ -204,6 +204,7 @@ export default function PlaylistsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          sortType: sortMode || "artist_separation",
           trackUris: reorderedTracks.map((t) => t.uri),
         }),
       });
@@ -238,7 +239,7 @@ export default function PlaylistsPage() {
   };
 
   // Save Order Handler
-  const handleSaveOrder = (reorderedTracks: SpotifyTrack[]) => {
+  const handleSaveOrder = (reorderedTracks: SpotifyTrack[], sortMode: string) => {
     if (!selectedPlaylist) return;
 
     setDialog({
@@ -246,7 +247,7 @@ export default function PlaylistsPage() {
       type: "confirm",
       title: "Save Track Order to Spotify",
       message: `Are you sure you want to apply this new track order to "${selectedPlaylist.name}" on Spotify?`,
-      onConfirm: () => executeSaveOrder(selectedPlaylist, reorderedTracks),
+      onConfirm: () => executeSaveOrder(selectedPlaylist, reorderedTracks, sortMode),
     });
   };
 

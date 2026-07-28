@@ -33,7 +33,7 @@ interface PlaylistDetailViewProps {
   onOpenCopyPicker: () => void;
   onRemoveDuplicates: () => void;
   deduplicating: boolean;
-  onSaveOrder?: (reorderedTracks: SpotifyTrack[]) => void;
+  onSaveOrder?: (reorderedTracks: SpotifyTrack[], sortMode: SortMode) => void;
   savingOrder?: boolean;
 }
 
@@ -273,7 +273,7 @@ export function PlaylistDetailView({
             {hasWriteAccess && isModifiedOrder && onSaveOrder && (
               <button
                 className="btn btn-primary"
-                onClick={() => onSaveOrder(displayTracks)}
+                onClick={() => onSaveOrder(displayTracks, sortMode)}
                 disabled={savingOrder}
                 style={{ padding: "8px 16px", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
                 id="save-order-spotify-btn"

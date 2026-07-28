@@ -18,18 +18,20 @@ export async function POST(
 
   try {
     const body = await request.json().catch(() => ({}));
+    const sortType = body.sortType;
     let urisToApply: string[] = body.trackUris || [];
 
-    // If sortType is "artist_separation", compute smart order on server if URIs not explicitly provided
-    if (body.sortType === "artist_separation" && urisToApply.length === 0) {
-      const currentTracks = await getPlaylistTracks(session.accessToken, playlistId);
-      const sortedTracks = smartOrderTracks(currentTracks);
+    // If sortType is "artist_separation" (or if no URIs provided),
+    // fetch all tracks directly on the server to guarantee 100% pagination coverage
+    if (sortType === "artist_separation" || urisToApply.length === 0) {
+      const allTracks = await getPlaylistTracks(session.accessToken, playlistId);
+      const sortedTracks = smartOrderTracks(allTracks);
       urisToApply = sortedTracks.map((t) => t.uri);
     }
 
     if (!urisToApply || urisToApply.length === 0) {
       return NextResponse.json(
-        { error: "No track URIs provided for reordering." },
+        { error: "No track URIs found for reordering." },
         { status: 400 }
       );
     }

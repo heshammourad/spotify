@@ -63,44 +63,42 @@ export async function getPlaylist(accessToken: string, playlistId: string): Prom
   return spotifyFetch(`https://api.spotify.com/v1/playlists/${playlistId}`, accessToken);
 }
 
-// Fetch all tracks in a playlist (paginated)
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Fetch all tracks in a playlist (paginated using data.next)
 export async function getPlaylistTracks(accessToken: string, playlistId: string): Promise<SpotifyTrack[]> {
   const tracks: SpotifyTrack[] = [];
-  let offset = 0;
-  const limit = 100;
+  let url: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
 
   try {
-    while (true) {
-      const url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}`;
+    let position = 0;
+    while (url) {
       const data = await spotifyFetch(url, accessToken);
-      
       if (!data || !data.items || data.items.length === 0) {
         break;
       }
 
       for (let i = 0; i < data.items.length; i++) {
         const item = data.items[i];
-        const track = item.track;
-        if (track) {
+        const track = item?.track;
+        if (track && track.uri) {
           tracks.push({
-            id: track.id,
-            title: track.name,
-            artists: track.artists.map((artist: { name: string }) => artist.name),
+            id: track.id || `track-${position}`,
+            title: track.name || "Untitled",
+            artists: Array.isArray(track.artists)
+              ? track.artists.map((artist: { name: string }) => artist.name)
+              : [],
             uri: track.uri,
-            added_at: item.added_at,
-            position: offset + i,
+            added_at: item.added_at || "",
+            position: position++,
           });
         }
       }
 
-      offset += limit;
-      if (data.items.length < limit) {
-        break;
-      }
+      url = data.next;
     }
   } catch (error) {
     console.error(`Error fetching tracks for playlist ID ${playlistId}:`, error);
-    // Return empty list on failure, mirroring python client.py behaviour
     return [];
   }
 
@@ -224,6 +222,9 @@ export async function addTracksInBatches(
   const batchSize = 100;
 
   for (let i = 0; i < trackUris.length; i += batchSize) {
+    if (i > 0) {
+      await sleep(300);
+    }
     const batch = trackUris.slice(i, i + batchSize);
     await spotifyFetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, accessToken, {
       method: "POST",
@@ -260,8 +261,10 @@ export async function reorderPlaylistTracks(
     }),
   });
 
-  // If there are more than 100 tracks, append the remaining in batches of 100
+  // If there are more than 100 tracks, wait briefly for Spotify's async backend state to register,
+  // then append the remaining tracks in batches of 100
   if (trackUris.length > 100) {
+    await sleep(500);
     const remainingUris = trackUris.slice(100);
     await addTracksInBatches(accessToken, playlistId, remainingUris);
   }
