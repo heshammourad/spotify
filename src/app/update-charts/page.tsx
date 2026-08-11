@@ -342,13 +342,44 @@ export default function UpdateChartsPage() {
         }),
       });
 
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
         throw new Error(`Execution failed: ${res.statusText}`);
       }
 
-      const data = await res.json();
-      setUpdateLogs(data.log || ["Execution completed with no logs returned."]);
-      setUpdateCompleted(true);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let streamError: string | null = null;
+      let succeeded = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+
+          if (event.type === "log") {
+            setUpdateLogs((prev) => [...prev, event.message]);
+          } else if (event.type === "error") {
+            streamError = event.error;
+            setUpdateLogs((prev) => [...prev, `[ERROR] ${event.error}`]);
+          } else if (event.type === "done") {
+            succeeded = event.success;
+          }
+        }
+      }
+
+      if (streamError) {
+        throw new Error(streamError);
+      }
+
+      setUpdateCompleted(succeeded);
       showNotification("success", "Spotify playlists updated successfully!");
     } catch (err) {
       console.error(err);
