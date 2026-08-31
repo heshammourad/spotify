@@ -4,6 +4,7 @@ import Dialog from "@mui/material/Dialog";
 import Image from "next/image";
 import { Search, X, Music } from "lucide-react";
 import CircularProgress from "@mui/material/CircularProgress";
+import LinearProgress from "@mui/material/LinearProgress";
 import { SpotifyPlaylist } from "../types";
 
 interface CopyTargetDialogProps {
@@ -11,6 +12,7 @@ interface CopyTargetDialogProps {
   selectedPlaylist: SpotifyPlaylist | null;
   onClose: () => void;
   copying: boolean;
+  copyProgress: { added: number; total: number } | null;
   targetSearchQuery: string;
   onTargetSearchQueryChange: (q: string) => void;
   writeablePlaylists: SpotifyPlaylist[];
@@ -24,6 +26,7 @@ export function CopyTargetDialog({
   selectedPlaylist,
   onClose,
   copying,
+  copyProgress,
   targetSearchQuery,
   onTargetSearchQueryChange,
   writeablePlaylists,
@@ -100,7 +103,7 @@ export function CopyTargetDialog({
         <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0 }}>
           {allowDuplicates
             ? "Select a target playlist to copy all songs into (including duplicate songs already in target)."
-            : "Select a target playlist to copy these songs into. We\u0026apos;ll automatically filter out duplicates."}
+            : "Select a target playlist to copy these songs into. We'll automatically filter out duplicates."}
         </p>
 
         {/* Option to allow duplicates */}
@@ -180,9 +183,25 @@ export function CopyTargetDialog({
           id="copy-target-list"
         >
           {copying ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 0", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 0", gap: "12px", width: "100%" }}>
               <CircularProgress size={32} style={{ color: "var(--spotify-green)" }} />
-              <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", margin: 0 }}>Copying songs...</p>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", margin: 0 }}>
+                {copyProgress && copyProgress.total > 0
+                  ? `Copied ${copyProgress.added} of ${copyProgress.total} songs...`
+                  : "Scanning playlists..."}
+              </p>
+              {copyProgress && copyProgress.total > 0 && (
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min(100, Math.round((copyProgress.added / copyProgress.total) * 100))}
+                  style={{
+                    width: "80%",
+                    borderRadius: "999px",
+                    backgroundColor: "rgba(255, 255, 255, 0.08)",
+                  }}
+                  sx={{ "& .MuiLinearProgress-bar": { backgroundColor: "var(--spotify-green)" } }}
+                />
+              )}
             </div>
           ) : (
             <>
