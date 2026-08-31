@@ -214,7 +214,8 @@ export async function removeDuplicatesFromPlaylist(
 export async function addTracksInBatches(
   accessToken: string,
   playlistId: string,
-  trackUris: string[]
+  trackUris: string[],
+  onBatch?: (addedSoFar: number, total: number) => void
 ): Promise<number> {
   if (trackUris.length === 0) return 0;
 
@@ -233,6 +234,7 @@ export async function addTracksInBatches(
       }),
     });
     addedCount += batch.length;
+    onBatch?.(addedCount, trackUris.length);
   }
 
   return addedCount;
@@ -378,26 +380,41 @@ export async function removePlaylistTracks(
 // Note: This method now resolves the issue of Spotify-authored/curated playlists!
 // Because we use the token's read permissions to fetch tracks and write permissions to add tracks,
 // we can fetch from ANY public playlist and copy to any user-owned playlist.
+export interface CopyProgressEvent {
+  type: "log" | "progress";
+  message?: string;
+  /** Tracks added to the target so far (cumulative across all sources). */
+  added?: number;
+  /** Total tracks planned to add so far (grows as each source is scanned). */
+  total?: number;
+}
+
 export async function copyTracksToPlaylist(
   accessToken: string,
   sourcePlaylistIds: string[],
   targetPlaylistId: string,
-  allowDuplicates: boolean = false
+  allowDuplicates: boolean = false,
+  onProgress?: (event: CopyProgressEvent) => void
 ): Promise<{ totalCopied: number; details: string[] }> {
   const logDetails: string[] = [];
-  logDetails.push(`Starting copy operation to target playlist: ${targetPlaylistId}`);
+  const log = (message: string) => {
+    logDetails.push(message);
+    onProgress?.({ type: "log", message });
+  };
+  log(`Starting copy operation to target playlist: ${targetPlaylistId}`);
 
   let existingTargetTrackUris = new Set<string>();
   if (!allowDuplicates) {
     // 1. Fetch tracks from the target playlist ONCE
-    logDetails.push("Fetching existing tracks from the target playlist...");
+    log("Fetching existing tracks from the target playlist...");
     const targetTracks = await getPlaylistTracks(accessToken, targetPlaylistId);
     existingTargetTrackUris = new Set(targetTracks.map((t) => t.uri));
   } else {
-    logDetails.push("Allowing duplicates (copying all tracks without filtering)...");
+    log("Allowing duplicates (copying all tracks without filtering)...");
   }
 
   let totalAddedCount = 0;
+  let totalPlannedCount = 0;
 
   // 2. Iterate through each source playlist
   for (const sourceId of sourcePlaylistIds) {
@@ -411,20 +428,20 @@ export async function copyTracksToPlaylist(
       if (sourceInfo) {
         sourcePlaylistName = sourceInfo.name;
       }
-      logDetails.push(`Processing source playlist: '${sourcePlaylistName}' (${sourceId})`);
+      log(`Processing source playlist: '${sourcePlaylistName}' (${sourceId})`);
     } catch {
-      logDetails.push(`Warning: Could not fetch info for source playlist ID: ${sourceId}. Trying to fetch tracks directly.`);
+      log(`Warning: Could not fetch info for source playlist ID: ${sourceId}. Trying to fetch tracks directly.`);
     }
 
     try {
       sourceTracks = await getPlaylistTracks(accessToken, sourceId);
     } catch {
-      logDetails.push(`Error fetching tracks for source playlist ID ${sourceId}. Skipping.`);
+      log(`Error fetching tracks for source playlist ID ${sourceId}. Skipping.`);
       continue;
     }
 
     if (sourceTracks.length === 0) {
-      logDetails.push(`  Source playlist '${sourcePlaylistName}' is empty or could not fetch tracks.`);
+      log(`  Source playlist '${sourcePlaylistName}' is empty or could not fetch tracks.`);
       continue;
     }
 
@@ -442,16 +459,28 @@ export async function copyTracksToPlaylist(
     }
 
     if (tracksToAddUris.length === 0) {
-      logDetails.push(`  All tracks from '${sourcePlaylistName}' already exist in the target. No new tracks to copy.`);
+      log(`  All tracks from '${sourcePlaylistName}' already exist in the target. No new tracks to copy.`);
       continue;
     }
 
-    logDetails.push(`  Identified ${tracksToAddUris.length} track(s) from '${sourcePlaylistName}' to add.`);
+    log(`  Identified ${tracksToAddUris.length} track(s) from '${sourcePlaylistName}' to add.`);
 
-    // Batch add to target playlist
-    const addedCount = await addTracksInBatches(accessToken, targetPlaylistId, tracksToAddUris);
+    // Batch add to target playlist, reporting progress after each batch of 100
+    totalPlannedCount += tracksToAddUris.length;
+    onProgress?.({ type: "progress", added: totalAddedCount, total: totalPlannedCount });
+    const addedCount = await addTracksInBatches(
+      accessToken,
+      targetPlaylistId,
+      tracksToAddUris,
+      (addedSoFar) =>
+        onProgress?.({
+          type: "progress",
+          added: totalAddedCount + addedSoFar,
+          total: totalPlannedCount,
+        })
+    );
     totalAddedCount += addedCount;
-    logDetails.push(`  Successfully copied ${addedCount} track(s) from '${sourcePlaylistName}'.`);
+    log(`  Successfully copied ${addedCount} track(s) from '${sourcePlaylistName}'.`);
 
     // Update existing target URIs to avoid duplicates in subsequent sources
     if (!allowDuplicates) {
@@ -459,8 +488,8 @@ export async function copyTracksToPlaylist(
     }
   }
 
-  logDetails.push(`Copy operation completed. Total ${totalAddedCount} tracks added.`);
-  
+  log(`Copy operation completed. Total ${totalAddedCount} tracks added.`);
+
   return {
     totalCopied: totalAddedCount,
     details: logDetails,

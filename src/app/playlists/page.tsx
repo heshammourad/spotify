@@ -28,6 +28,7 @@ export default function PlaylistsPage() {
   // Copy target modal state
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [copyProgress, setCopyProgress] = useState<{ added: number; total: number } | null>(null);
   const [targetSearchQuery, setTargetSearchQuery] = useState("");
   const [allowDuplicates, setAllowDuplicates] = useState(false);
 
@@ -263,6 +264,7 @@ export default function PlaylistsPage() {
     if (!selectedPlaylist) return;
 
     setCopying(true);
+    setCopyProgress(null);
     try {
       const res = await fetch(`${BASE_PATH}/api/playlists/${selectedPlaylist.id}/copy-to`, {
         method: "POST",
@@ -275,20 +277,51 @@ export default function PlaylistsPage() {
         }),
       });
 
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
         throw new Error(`Copy tracks request failed: ${res.statusText}`);
       }
 
-      const data = await res.json();
+      // The endpoint streams NDJSON: { type: "log" | "progress" | "done" | "error" }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let streamError: string | null = null;
+      let copiedCount = 0;
 
-      if (data.copiedCount > 0) {
-        showNotification("success", `Copied ${data.copiedCount} song(s) to "${targetPlaylist.name}"!`);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+
+          if (event.type === "progress") {
+            setCopyProgress({ added: event.added ?? 0, total: event.total ?? 0 });
+          } else if (event.type === "error") {
+            streamError = event.error;
+          } else if (event.type === "done") {
+            copiedCount = event.copiedCount ?? 0;
+          }
+        }
+      }
+
+      if (streamError) {
+        throw new Error(streamError);
+      }
+
+      if (copiedCount > 0) {
+        showNotification("success", `Copied ${copiedCount} song(s) to "${targetPlaylist.name}"!`);
         setIsCopyModalOpen(false);
         // Update target playlist count in local state to bypass stale cache
         setPlaylists((prevPlaylists) =>
           prevPlaylists.map((p) =>
             p.id === targetPlaylist.id
-              ? { ...p, tracks: { total: p.tracks.total + data.copiedCount } }
+              ? { ...p, tracks: { total: p.tracks.total + copiedCount } }
               : p
           )
         );
@@ -303,6 +336,7 @@ export default function PlaylistsPage() {
       showNotification("error", err instanceof Error ? err.message : "Failed to copy tracks.");
     } finally {
       setCopying(false);
+      setCopyProgress(null);
     }
   };
 
@@ -365,6 +399,7 @@ export default function PlaylistsPage() {
         selectedPlaylist={selectedPlaylist}
         onClose={() => setIsCopyModalOpen(false)}
         copying={copying}
+        copyProgress={copyProgress}
         targetSearchQuery={targetSearchQuery}
         onTargetSearchQueryChange={setTargetSearchQuery}
         writeablePlaylists={writeablePlaylists}
