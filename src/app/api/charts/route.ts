@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { fetchChart } from "@/lib/billboard";
-import { getChartDate, searchSong } from "@/lib/db";
+import { fetchChart, type ChartData } from "@/lib/billboard";
+import { getChartDate, getCachedChart, saveCachedChart, searchSong } from "@/lib/db";
 import { BILLBOARD_CHARTS } from "@/lib/config";
 
 /**
@@ -39,9 +39,23 @@ export async function GET() {
     
     // Fetch charts with limited concurrency (Billboard rate-limits bursts)
     const charts = await mapWithConcurrency(BILLBOARD_CHARTS, 3, async (chartConf) => {
-      const scraped = await fetchChart(chartConf.id, chartConf.maxSongs);
       const dbDate = await getChartDate(chartConf.id);
-      
+
+      let scraped = await fetchChart(chartConf.id, chartConf.maxSongs);
+      let stale: string | null = null;
+
+      if (scraped) {
+        // Remember this good copy so a future scrape failure can fall back to it
+        await saveCachedChart(chartConf.id, scraped);
+      } else {
+        // Scrape failed (Billboard block / network). Serve the last good copy.
+        const cached = await getCachedChart<ChartData>(chartConf.id);
+        if (cached) {
+          scraped = cached.data;
+          stale = cached.fetchedAt;
+        }
+      }
+
       if (!scraped) {
         return {
           id: chartConf.id,
@@ -78,6 +92,7 @@ export async function GET() {
         date: scraped.date,
         dbDate: dbDate || "Never updated",
         isUpToDate,
+        stale,
         songs: songsWithMapping
       };
     });

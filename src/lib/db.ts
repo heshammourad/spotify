@@ -48,6 +48,13 @@ async function getDb() {
             date TEXT NOT NULL
           );
         `);
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS chart_cache (
+            chart_id TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            fetched_at TEXT NOT NULL
+          );
+        `);
       } finally {
         client.release();
       }
@@ -80,6 +87,11 @@ async function getDb() {
         CREATE TABLE IF NOT EXISTS charts (
           name TEXT PRIMARY KEY,
           date TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS chart_cache (
+          chart_id TEXT PRIMARY KEY,
+          data TEXT NOT NULL,
+          fetched_at TEXT NOT NULL
         );
       `);
     }
@@ -150,6 +162,57 @@ export async function getChartDate(chartName: string): Promise<string | null> {
       [chartName]
     );
     return row?.date || null;
+  }
+}
+
+export interface CachedChart<T> {
+  data: T;
+  fetchedAt: string; // ISO timestamp of when the scrape succeeded
+}
+
+/** Store the most recent successful scrape of a chart, for use as a fallback. */
+export async function saveCachedChart<T>(chartId: string, data: T): Promise<void> {
+  const db = await getDb();
+  const payload = JSON.stringify(data);
+  const fetchedAt = new Date().toISOString();
+  if (db.type === "postgres") {
+    await db.client.query(
+      `INSERT INTO chart_cache(chart_id, data, fetched_at)
+       VALUES($1, $2, $3)
+       ON CONFLICT(chart_id) DO UPDATE SET data = EXCLUDED.data, fetched_at = EXCLUDED.fetched_at`,
+      [chartId, payload, fetchedAt]
+    );
+  } else {
+    await db.client.run(
+      `INSERT INTO chart_cache(chart_id, data, fetched_at)
+       VALUES(?, ?, ?)
+       ON CONFLICT(chart_id) DO UPDATE SET data = excluded.data, fetched_at = excluded.fetched_at`,
+      [chartId, payload, fetchedAt]
+    );
+  }
+}
+
+/** Read the last successfully-scraped copy of a chart, if any. */
+export async function getCachedChart<T>(chartId: string): Promise<CachedChart<T> | null> {
+  const db = await getDb();
+  let row: { data: string; fetched_at: string } | undefined;
+  if (db.type === "postgres") {
+    const res = await db.client.query(
+      "SELECT data, fetched_at FROM chart_cache WHERE chart_id = $1 LIMIT 1",
+      [chartId]
+    );
+    row = res.rows[0];
+  } else {
+    row = await db.client.get(
+      "SELECT data, fetched_at FROM chart_cache WHERE chart_id = ? LIMIT 1",
+      [chartId]
+    );
+  }
+  if (!row) return null;
+  try {
+    return { data: JSON.parse(row.data) as T, fetchedAt: row.fetched_at };
+  } catch {
+    return null;
   }
 }
 

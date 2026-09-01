@@ -125,6 +125,16 @@ export function ChartAccordionItem({
 
           {unmappedCountInChart > 0 && <span className="badge badge-danger">{unmappedCountInChart} unmapped</span>}
 
+          {chart.stale && (
+            <span
+              className="badge"
+              style={{ background: "rgba(240, 173, 78, 0.15)", color: "#f0ad4e" }}
+              title={`Billboard scrape failed; showing cached data from ${new Date(chart.stale).toLocaleString()}`}
+            >
+              Cached
+            </span>
+          )}
+
           {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </div>
       </div>
