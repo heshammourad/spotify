@@ -15,6 +15,8 @@ export interface RequestChart {
   isUpToDate: boolean;
   songs: RequestSong[];
   error?: string;
+  /** ISO timestamp when this data was scraped, set only when serving a stale cached copy after a scrape failure. */
+  stale?: string | null;
 }
 
 export interface SpotifySearchResult {

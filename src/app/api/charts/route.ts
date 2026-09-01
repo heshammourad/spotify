@@ -1,8 +1,31 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { fetchChart } from "@/lib/billboard";
-import { getChartDate, searchSong } from "@/lib/db";
+import { fetchChart, type ChartData } from "@/lib/billboard";
+import { getChartDate, getCachedChart, saveCachedChart, searchSong } from "@/lib/db";
 import { BILLBOARD_CHARTS } from "@/lib/config";
+
+/**
+ * Run async tasks with a cap on how many are in flight at once. Billboard blocks
+ * bursts of parallel requests from datacenter IPs, so we keep concurrency low.
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await fn(items[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
 
 export async function GET() {
   const session = await getSession();
@@ -14,11 +37,25 @@ export async function GET() {
   try {
     console.log("Fetching Billboard charts and database mapping status...");
     
-    // Fetch all charts in parallel
-    const chartPromises = BILLBOARD_CHARTS.map(async (chartConf) => {
-      const scraped = await fetchChart(chartConf.id, chartConf.maxSongs);
+    // Fetch charts with limited concurrency (Billboard rate-limits bursts)
+    const charts = await mapWithConcurrency(BILLBOARD_CHARTS, 3, async (chartConf) => {
       const dbDate = await getChartDate(chartConf.id);
-      
+
+      let scraped = await fetchChart(chartConf.id, chartConf.maxSongs);
+      let stale: string | null = null;
+
+      if (scraped) {
+        // Remember this good copy so a future scrape failure can fall back to it
+        await saveCachedChart(chartConf.id, scraped);
+      } else {
+        // Scrape failed (Billboard block / network). Serve the last good copy.
+        const cached = await getCachedChart<ChartData>(chartConf.id);
+        if (cached) {
+          scraped = cached.data;
+          stale = cached.fetchedAt;
+        }
+      }
+
       if (!scraped) {
         return {
           id: chartConf.id,
@@ -55,11 +92,11 @@ export async function GET() {
         date: scraped.date,
         dbDate: dbDate || "Never updated",
         isUpToDate,
+        stale,
         songs: songsWithMapping
       };
     });
 
-    const charts = await Promise.all(chartPromises);
     return NextResponse.json({ charts });
 
   } catch (error) {
