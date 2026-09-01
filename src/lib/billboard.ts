@@ -14,25 +14,64 @@ export interface ChartData {
   songs: ChartSong[];
 }
 
-export async function fetchChart(chartId: string, maxSongs?: number): Promise<ChartData | null> {
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Billboard is bot-protected (Cloudflare) and rate-limits/blocks bursts from
+ * datacenter IPs, so a single request often fails intermittently. Retry a few
+ * times with exponential backoff + jitter, rotating the User-Agent each attempt.
+ */
+async function fetchChartHtml(chartId: string, attempts = 3): Promise<string | null> {
   const url = `https://www.billboard.com/charts/${chartId}/`;
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-      },
-    });
-
-    if (!response.ok) {
-      console.error(`Failed to fetch Billboard chart ${chartId}: ${response.status} ${response.statusText}`);
-      return null;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) {
+      const backoff = 500 * 2 ** (attempt - 1) + Math.floor(Math.random() * 400);
+      await sleep(backoff);
     }
 
-    const html = await response.text();
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": USER_AGENTS[attempt % USER_AGENTS.length],
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
+        },
+      });
+
+      if (response.ok) {
+        return await response.text();
+      }
+
+      console.error(
+        `Failed to fetch Billboard chart ${chartId} (attempt ${attempt + 1}/${attempts}): ${response.status} ${response.statusText}`,
+      );
+    } catch (error) {
+      console.error(
+        `Error fetching Billboard chart ${chartId} (attempt ${attempt + 1}/${attempts}):`,
+        error,
+      );
+    }
+  }
+
+  return null;
+}
+
+export async function fetchChart(chartId: string, maxSongs?: number): Promise<ChartData | null> {
+  try {
+    const html = await fetchChartHtml(chartId);
+    if (html === null) {
+      return null;
+    }
     const $ = cheerio.load(html);
 
     // 1. Get chart name cleanly
