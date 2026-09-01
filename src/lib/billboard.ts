@@ -30,6 +30,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 async function fetchChartHtml(chartId: string, attempts = 3): Promise<string | null> {
   const url = `https://www.billboard.com/charts/${chartId}/`;
+  const uaOffset = Math.floor(Math.random() * USER_AGENTS.length);
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) {
@@ -40,7 +41,7 @@ async function fetchChartHtml(chartId: string, attempts = 3): Promise<string | n
     try {
       const response = await fetch(url, {
         headers: {
-          "User-Agent": USER_AGENTS[attempt % USER_AGENTS.length],
+          "User-Agent": USER_AGENTS[(uaOffset + attempt) % USER_AGENTS.length],
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.9",
           "Cache-Control": "no-cache",
