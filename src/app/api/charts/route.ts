@@ -50,7 +50,7 @@ export async function GET() {
       } else {
         // Scrape failed (Billboard block / network). Serve the last good copy.
         const cached = await getCachedChart<ChartData>(chartConf.id);
-        if (cached) {
+        if (cached && cached.data.songs.length > 0) {
           scraped = cached.data;
           stale = cached.fetchedAt;
         }
