@@ -1,7 +1,11 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Globe, AlertTriangle, ArrowRight, Terminal } from "lucide-react";
 import CircularProgress from "@mui/material/CircularProgress";
+
+// Distance (px) from the bottom within which the console still counts as "scrolled to bottom".
+const AUTO_SCROLL_THRESHOLD = 24;
 
 interface SyncActionPanelProps {
   spotifyNumberOne: string;
@@ -22,6 +26,23 @@ export function SyncActionPanel({
   updateCompleted,
   onExecuteUpdate,
 }: SyncActionPanelProps) {
+  const logsConsoleRef = useRef<HTMLDivElement>(null);
+  const [autoScroll, setAutoScroll] = useState(true);
+
+  useEffect(() => {
+    if (!autoScroll) return;
+    const el = logsConsoleRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [updateLogs, autoScroll]);
+
+  const handleLogsScroll = () => {
+    const el = logsConsoleRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setAutoScroll(distanceFromBottom <= AUTO_SCROLL_THRESHOLD);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px", marginTop: "12px" }}>
       {/* Spotify USA Weekly #1 Card */}
@@ -150,6 +171,8 @@ export function SyncActionPanel({
             {updateCompleted && <span className="badge badge-success">Completed Successfully</span>}
           </div>
           <div
+            ref={logsConsoleRef}
+            onScroll={handleLogsScroll}
             style={{
               fontFamily: "monospace",
               fontSize: "0.8rem",
