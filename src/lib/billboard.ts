@@ -50,12 +50,20 @@ async function fetchChartHtml(chartId: string, attempts = 3): Promise<string | n
       });
 
       if (response.ok) {
-        return await response.text();
+        const html = await response.text();
+        // A 200 from Cloudflare's bot challenge / "Access Denied" page won't
+        // contain the chart markup — treat that as a failed attempt and retry.
+        if (html.includes("o-chart-results-list-row")) {
+          return html;
+        }
+        console.error(
+          `Billboard chart ${chartId} returned 200 without chart markup (attempt ${attempt + 1}/${attempts}); likely a bot challenge`,
+        );
+      } else {
+        console.error(
+          `Failed to fetch Billboard chart ${chartId} (attempt ${attempt + 1}/${attempts}): ${response.status} ${response.statusText}`,
+        );
       }
-
-      console.error(
-        `Failed to fetch Billboard chart ${chartId} (attempt ${attempt + 1}/${attempts}): ${response.status} ${response.statusText}`,
-      );
     } catch (error) {
       console.error(
         `Error fetching Billboard chart ${chartId} (attempt ${attempt + 1}/${attempts}):`,
@@ -146,6 +154,13 @@ export async function fetchChart(chartId: string, maxSongs?: number): Promise<Ch
         title,
         artist,
       });
+    }
+
+    if (songs.length === 0) {
+      // Markup was present but no rows parsed — a Billboard structure change or
+      // a partial page. Treat as a failure so the cached copy is used instead.
+      console.error(`Scraped Billboard chart ${chartId} but parsed 0 songs`);
+      return null;
     }
 
     return {
