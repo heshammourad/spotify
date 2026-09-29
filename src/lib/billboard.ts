@@ -135,17 +135,24 @@ export async function fetchChart(chartId: string, maxSongs?: number): Promise<Ch
 
       if (!title || !artist) continue;
 
-      // Extract last week's rank
-      const stats = container.find("ul > div");
+      // Extract last week's rank. The stat columns (LW, PEAK, WKS) follow the
+      // title/artist <li> in document order; LW is the first one whose text is
+      // a rank or "-". Don't depend on the exact wrapper elements between them —
+      // Billboard reshuffles those, which previously left every LW as "-".
       let lw = "-";
-      if (stats.length) {
-        const lwNode = stats.find("div").first();
-        if (lwNode.length) {
-          const lwLi = lwNode.find("li").first();
-          if (lwLi.length) {
-            lw = lwLi.text().trim();
-          }
+      const rowItems = row.find("li").toArray();
+      const statItems = rowItems
+        .slice(rowItems.indexOf(songInfo.get(0)!) + 1)
+        .filter((el) => $(el).closest(songInfo).length === 0);
+      $(statItems).each((_, el) => {
+        const text = $(el).text().trim();
+        if (/^(\d+|-)$/.test(text)) {
+          lw = text;
+          return false; // break loop
         }
+      });
+      if (i === 0 && statItems.length === 0) {
+        console.error(`Billboard chart ${chartId}: no stat columns found next to title; LW will be "-"`);
       }
 
       songs.push({
