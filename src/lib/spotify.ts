@@ -70,36 +70,33 @@ export async function getPlaylistTracks(accessToken: string, playlistId: string)
   const tracks: SpotifyTrack[] = [];
   let url: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
 
-  try {
-    let position = 0;
-    while (url) {
-      const data = await spotifyFetch(url, accessToken);
-      if (!data || !data.items || data.items.length === 0) {
-        break;
-      }
-
-      for (let i = 0; i < data.items.length; i++) {
-        const item = data.items[i];
-        const track = item?.track;
-        if (track && track.uri) {
-          tracks.push({
-            id: track.id || `track-${position}`,
-            title: track.name || "Untitled",
-            artists: Array.isArray(track.artists)
-              ? track.artists.map((artist: { name: string }) => artist.name)
-              : [],
-            uri: track.uri,
-            added_at: item.added_at || "",
-            position: position++,
-          });
-        }
-      }
-
-      url = data.next;
+  // Let fetch errors propagate: callers use this list to decide what to write,
+  // and treating a failed fetch as an empty playlist causes duplicate adds.
+  let position = 0;
+  while (url) {
+    const data = await spotifyFetch(url, accessToken);
+    if (!data || !data.items || data.items.length === 0) {
+      break;
     }
-  } catch (error) {
-    console.error(`Error fetching tracks for playlist ID ${playlistId}:`, error);
-    return [];
+
+    for (let i = 0; i < data.items.length; i++) {
+      const item = data.items[i];
+      const track = item?.track;
+      if (track && track.uri) {
+        tracks.push({
+          id: track.id || `track-${position}`,
+          title: track.name || "Untitled",
+          artists: Array.isArray(track.artists)
+            ? track.artists.map((artist: { name: string }) => artist.name)
+            : [],
+          uri: track.uri,
+          added_at: item.added_at || "",
+          position: position++,
+        });
+      }
+    }
+
+    url = data.next;
   }
 
   return tracks;
