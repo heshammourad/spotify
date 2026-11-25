@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Globe, AlertTriangle, ArrowRight, Terminal } from "lucide-react";
 import CircularProgress from "@mui/material/CircularProgress";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
 
 // Distance (px) from the bottom within which the console still counts as "scrolled to bottom".
 const AUTO_SCROLL_THRESHOLD = 24;
@@ -10,6 +12,8 @@ const AUTO_SCROLL_THRESHOLD = 24;
 interface SyncActionPanelProps {
   spotifyNumberOne: string;
   onSpotifyNumberOneChange: (val: string) => void;
+  keepTempTracks: boolean;
+  onKeepTempTracksChange: (val: boolean) => void;
   unresolvedSongsCount: number;
   updatingPlaylists: boolean;
   updateLogs: string[];
@@ -20,6 +24,8 @@ interface SyncActionPanelProps {
 export function SyncActionPanel({
   spotifyNumberOne,
   onSpotifyNumberOneChange,
+  keepTempTracks,
+  onKeepTempTracksChange,
   unresolvedSongsCount,
   updatingPlaylists,
   updateLogs,
@@ -119,6 +125,20 @@ export function SyncActionPanel({
             )}
           </p>
         </div>
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={keepTempTracks}
+              onChange={(e) => onKeepTempTracksChange(e.target.checked)}
+              disabled={updatingPlaylists}
+              id="keep-temp-tracks-checkbox"
+              sx={{ color: "var(--text-secondary)", "&.Mui-checked": { color: "var(--spotify-green)" } }}
+            />
+          }
+          label="Keep existing Temp playlist songs (append new songs, skipping duplicates)"
+          sx={{ color: "var(--text-secondary)", "& .MuiFormControlLabel-label": { fontSize: "0.9rem" } }}
+        />
 
         <button
           onClick={onExecuteUpdate}
