@@ -29,6 +29,9 @@ export default function UpdateChartsPage() {
   // Spotify USA Number One state
   const [spotifyNumberOne, setSpotifyNumberOne] = useState("");
 
+  // Keep existing Temp playlist tracks instead of clearing it before sync
+  const [keepTempTracks, setKeepTempTracks] = useState(false);
+
   // Execution states
   const [updatingPlaylists, setUpdatingPlaylists] = useState(false);
   const [updateLogs, setUpdateLogs] = useState<string[]>([]);
@@ -308,7 +311,9 @@ export default function UpdateChartsPage() {
       isOpen: true,
       type: "confirm",
       title: "Sync Playlists",
-      message: "Are you sure you want to execute playlist updates? This will clear the Temp playlist and update Spotify playlists.",
+      message: keepTempTracks
+        ? "Are you sure you want to execute playlist updates? New songs will be appended to the existing Temp playlist and Spotify playlists will be updated."
+        : "Are you sure you want to execute playlist updates? This will clear the Temp playlist and update Spotify playlists.",
       onConfirm: executeUpdate,
     });
   };
@@ -339,6 +344,7 @@ export default function UpdateChartsPage() {
         body: JSON.stringify({
           charts: chartsPayload,
           spotifyNumberOne,
+          keepTempTracks,
         }),
       });
 
@@ -536,6 +542,8 @@ export default function UpdateChartsPage() {
         <SyncActionPanel
           spotifyNumberOne={spotifyNumberOne}
           onSpotifyNumberOneChange={setSpotifyNumberOne}
+          keepTempTracks={keepTempTracks}
+          onKeepTempTracksChange={setKeepTempTracks}
           unresolvedSongsCount={unresolvedSongsCount}
           updatingPlaylists={updatingPlaylists}
           updateLogs={updateLogs}

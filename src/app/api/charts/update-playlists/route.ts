@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { updateChartDate } from "@/lib/db";
 import { CHART_PLAYLIST_MAP, TEMP_PLAYLIST_ID } from "@/lib/config";
-import { addTrackToPlaylist, removePlaylistTracks, addTracksInBatches } from "@/lib/spotify";
+import {
+  addTrackToPlaylist,
+  removePlaylistTracks,
+  addTracksInBatches,
+  getPlaylistTracks,
+} from "@/lib/spotify";
 
 interface RequestSong {
   rank: number;
@@ -31,9 +36,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { charts, spotifyNumberOne } = await request.json() as {
+  const { charts, spotifyNumberOne, keepTempTracks } = await request.json() as {
     charts: RequestChart[];
     spotifyNumberOne?: string;
+    keepTempTracks?: boolean;
   };
 
   if (!charts || !Array.isArray(charts)) {
@@ -52,10 +58,36 @@ export async function POST(request: Request) {
       try {
         log("Starting playlist update execution...");
 
-        // 1. Clear out Temp playlist
-        log(`Clearing out Temp playlist (${TEMP_PLAYLIST_ID})...`);
-        await removePlaylistTracks(session.accessToken, TEMP_PLAYLIST_ID, 0);
-        log("Temp playlist cleared.");
+        // 1. Clear out Temp playlist, or keep its existing tracks and append to them
+        const tempTrackIds = new Set<string>();
+        if (keepTempTracks) {
+          log(`Keeping existing tracks in Temp playlist (${TEMP_PLAYLIST_ID})...`);
+          const existing = await getPlaylistTracks(session.accessToken, TEMP_PLAYLIST_ID);
+          existing.forEach((t) => tempTrackIds.add(t.id));
+          log(`Temp playlist has ${tempTrackIds.size} existing tracks; new songs will be appended.`);
+        } else {
+          log(`Clearing out Temp playlist (${TEMP_PLAYLIST_ID})...`);
+          await removePlaylistTracks(session.accessToken, TEMP_PLAYLIST_ID, 0);
+          log("Temp playlist cleared.");
+        }
+
+        // Append tracks to Temp, skipping any already there (or added earlier in this run).
+        const addToTemp = async (trackIds: string[]) => {
+          const toAdd = trackIds.filter((id) => {
+            if (tempTrackIds.has(id)) return false;
+            tempTrackIds.add(id);
+            return true;
+          });
+          const skipped = trackIds.length - toAdd.length;
+          if (skipped > 0) {
+            log(`    -> ${skipped} track(s) already in Temp; skipped.`);
+          }
+          await addTracksInBatches(
+            session.accessToken,
+            TEMP_PLAYLIST_ID,
+            toAdd.map((id) => `spotify:track:${id}`)
+          );
+        };
 
         // 2. Process each chart
         for (const chart of charts) {
@@ -86,7 +118,7 @@ export async function POST(request: Request) {
 
               if (isNewInPlaylist) {
                 log(`    -> New song in top_tens; adding to Temp playlist.`);
-                await addTrackToPlaylist(session.accessToken, song.spotifyId, TEMP_PLAYLIST_ID);
+                await addToTemp([song.spotifyId]);
               }
             }
 
@@ -103,7 +135,7 @@ export async function POST(request: Request) {
 
               if (isNewInNumberOnes) {
                 log(`    -> New in number_ones; adding to Temp playlist.`);
-                await addTrackToPlaylist(session.accessToken, song.spotifyId, TEMP_PLAYLIST_ID);
+                await addToTemp([song.spotifyId]);
               }
             }
           }
@@ -119,8 +151,7 @@ export async function POST(request: Request) {
 
             if (removedTrackIds.length > 0) {
               log(`    -> Removed ${removedTrackIds.length} tracks. Adding them to Temp playlist...`);
-              const trackUris = removedTrackIds.map((id) => `spotify:track:${id}`);
-              await addTracksInBatches(session.accessToken, TEMP_PLAYLIST_ID, trackUris);
+              await addToTemp(removedTrackIds);
             } else {
               log(`    -> No tracks to remove (playlist size <= 100).`);
             }
@@ -141,7 +172,7 @@ export async function POST(request: Request) {
               );
               if (isNew) {
                 log("  -> New number one for Spotify USA chart; adding to Temp.");
-                await addTrackToPlaylist(session.accessToken, spotifyNo1Id, TEMP_PLAYLIST_ID);
+                await addToTemp([spotifyNo1Id]);
               } else {
                 log("  -> Song already present in Spotify number ones playlist.");
               }
